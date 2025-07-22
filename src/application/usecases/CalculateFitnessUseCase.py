@@ -101,8 +101,8 @@ class CalculateFitnessUseCase:
                 "right": row_index + 1,
                 "bottom": row_index
             }
-        
-            def get_pairs(row: any) -> None:
+
+            def get_pairs(row: int | List[int]) -> None:
                 for celd_index, celd in enumerate(row):
                     if isinstance(celd, list):
                         get_pairs(celd)
@@ -112,9 +112,11 @@ class CalculateFitnessUseCase:
                         plant_species_center = next((p.species for p in self._PLANTS_IN_HUERTO if p.id == celd), None)
                         
                         # calcuamos la posicion de las celdas vecinas "Derecha" y "Abajo"
-                        celd_bottom = row
-                        celd_right = celd_index + 1
-                        celd_right_bottom = 
+                        filas_parcela = self.HUERTO.parcela.layout
+
+                        index_celd_bottom = row_index + 1 if row_index + 1 < len(filas_parcela) else None
+                        index_celd_right = celd_index + 1 if celd_index + 1 < len(row) else None
+                        index_celd_right_bottom = row[row_index + 1]
 
                         # Obtenemos las especies de las plantas en las celdas vecinas
                         plant_species_right = next((p.species for p in self._PLANTS_IN_HUERTO if p.id == celd_right), None)
