@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 @dataclass
-class RATSODUVO:
+class RATVO:
     """
     Representa el rendimiento alimenticio o terapéutico de un huerto.
     """
