@@ -15,7 +15,7 @@ class CalculateFitnessUseCase:
     _weight_7: float = 0.15     # Cumplimiento objetivo
     
     _CEE: float = 0.0           # Compatibilidad entre Especies
-    _PSRATD: float = 0.0        # Porcentaje de Satisfacción del Rendimiento Alimenticio o Terapéutico Deseado
+    _PSRATA: float = 0.0        # Porcentaje de Satisfacción del Rendimiento Alimenticio o Terapéutico Alcanzado
     _ECA: float = 0.0           # Eficiencia de Consumo de Agua
     
     _FITNESS: float = 0.0       # Puntaje de aptitud
@@ -56,7 +56,7 @@ class CalculateFitnessUseCase:
         self.__Calculate_Compatibility()
         
         # Calculamos el Rendimiento Alimenticio o Terapéutico del Huerto
-        self.__Calculate_PSRATD()
+        self.__Calculate_PSRATA()
 
         # Calculamos la eficiencia de Consumo de Agua
         self.__Calculate_ECA()
@@ -106,7 +106,6 @@ class CalculateFitnessUseCase:
             return hash(frozenset(tuplas))
 
         for row_index, row_initial in enumerate(layout):
-                        
             # calcuamos la posicion de las celdas vecinas "Derecha" y "Abajo"
             filas_parcela = self.HUERTO.parcela.layout
 
@@ -189,8 +188,8 @@ class CalculateFitnessUseCase:
             # Calculamos la compatibilidad entre especies
             self._CEE += sumaCompatibilidadesVecinas  / compatibilidadMaximaPosible 
     
-    # Calculamos el Porcentaje de Satisfacción del Rendimiento Alimenticio o Terapéutico Deseado (PSRATD)
-    def __Calculate_PSRATD(self) -> None:
+    # Calculamos el Porcentaje de Satisfacción del Rendimiento Alimenticio Alcanzado (PSRATA)
+    def __Calculate_PSRATA(self) -> None:
         """
         Calcula el Rendimiento Alimenticio o Terapéutico del Huerto (RATH).
         :return: Rendimiento Alimenticio o Terapéutico del Huerto.
@@ -231,49 +230,40 @@ class CalculateFitnessUseCase:
         Calcula la Eficiencia de Consumo de Agua.
         :return: Eficiencia de Consumo de Agua.
         """
-        
         # Obtenemos el layout del huerto
         layout = self.HUERTO.parcela.layout
         
-        # Definimos una variable para contar el total de plantas en el layout del huerto
-        total_plants_in_layout = 0
+        # Iniciamos la matriz de pesos 
+        weights_celd_rh_max = []
+
+        # Inicializamos la variable para el consumo de agua total
+        RHT = 0.0
         
-        # Definimos el contador de requerimiento hídrico total (RHT)
-        RHT = 0
-        
-        # Definimos el contador de requerimiento hídrico máximo (RH_MAX)
-        RH_MAX: float = 0
-        
-        # Definimos funcion para obtener el requerimiento hídrico semanal de una fila del layout
-        # Recibe una celda que puede ser una lista o un entero
-        def get_weeklyWatering_row(celd: any) -> int:
+        # Definimos la funcion recursiva para detectar la planta que genere RH_MAX
+        # Cada celda genera un RH_MAX que es el maximo de consumo de agua que puede generar
+        def get_rht_celd(celd: int | List[int] | str) -> Dict[int, float]:
+            nonlocal weights_celd_rh_max, RHT
             """
-            Obtiene el requerimiento hídrico semanal de una fila del layout.
-            :param row: Fila del layout.
-            :return: Requerimiento hídrico semanal de la fila.
+            Obtiene los pesos de las celdas y el RH_MAX.
+            :param row: Fila del layout del huerto.
             """
-            # Si la fila es una lista, iteramos sobre sus celdas
             if isinstance(celd, list):
-                # Definimos que la celda es una lista de celdas
-                row = celd
-                sum_weekly_watering = 0
-                for sub_celd in row:
-                    sum_weekly_watering += get_weeklyWatering_row(sub_celd)
-                return sum_weekly_watering
-
-            if isinstance(celd, int):
-                total_plants_in_layout += 1
+                # Si la celda es una lista, iteramos sobre sus elementos
+                rh_celds = {}
+                for sub_celd in celd:
+                    plant = get_rht_celd(sub_celd)
+                    rh_celds.append(rht)
+            elif isinstance(celd, int):
+                # Si la celda es un entero, buscamos la planta en la lista de plantas
                 plant = next((p for p in self._PLANTS_IN_HUERTO if p.id == celd), None)
-                if plant.weeklyWatering > RH_MAX:
-                    RH_MAX = plant.weeklyWatering
-                return plant.weeklyWatering
-            return 0
-
-        for row in layout:
-            RHT += get_weeklyWatering_row(row)
+                if plant:
+                    # Agregamos el peso de la planta a la matriz de pesos
+                    weights_celd_rh_max.append(plant.weeklyWatering)
+                    
+                    # Sumamos el consumo de agua de la planta al total
+                    RHT += plant.weeklyWatering
+                    
+                    return plant.weeklyWatering
+            
+            
         
-        # Calculamos el Requerimiento hídrico total maximo (RHT) y el requerimiento hídrico máximo (RHT_MAX)
-        RHT_MAX = RH_MAX * total_plants_in_layout
-
-        # Calculamos la Eficiencia de Consumo de Agua (ECA)
-        self._ECA = 1 - (RHT / RHT_MAX)
