@@ -22,6 +22,6 @@ class PlantVO:
     # Litros por kg de producción
     waterPerKg: int
     # Lista de beneficios (nutricionales, medicinales, etc.)
-    benefits: list[str] = field(default_factory=list)
+    benefits: list[str]
     # Tamaño de la planta en m^2
     size: float

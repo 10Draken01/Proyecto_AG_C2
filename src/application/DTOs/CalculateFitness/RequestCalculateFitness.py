@@ -1,5 +1,5 @@
 
-from domain.entities.HuertoType import HuertoType
+from src.domain.entities.HuertoType import HuertoType
 from dataclasses import dataclass
 
 

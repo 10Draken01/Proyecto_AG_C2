@@ -1,39 +1,65 @@
 from typing import Dict, List, Literal, Union
-from domain.VOs.RATVO import RATVO
-from domain.entities.HuertoType import HuertoType
-from domain.VOs.PlantVO import PlantVO
-from application.DTOs.CalculateFitness.RequestCalculateFitness import RequestCalculateFitness
-from application.DTOs.CalculateFitness.ResponseCalculateFitness import ResponseCalculateFitness
+
+from src.domain.entities.ParcelaType import ParcelaType
+from src.domain.VOs.RATVO import RATVO
+from src.domain.entities.HuertoType import HuertoType
+from src.domain.VOs.PlantVO import PlantVO
+from src.application.DTOs.CalculateFitness.RequestCalculateFitness import RequestCalculateFitness
+from src.application.DTOs.CalculateFitness.ResponseCalculateFitness import ResponseCalculateFitness
 
 class CalculateFitnessUseCase:
-    _weight_1: float = 0.15     # Compatibilidad especies
-    _weight_2: float = 0.20     # Rendimiento
-    _weight_3: float = 0.20     # Eficiencia hídrica
-    _weight_4: float = 0.10     # Uso espacio
-    _weight_5: float = 0.10     # Luz solar/sombra
-    _weight_6: float = 0.10     # Facilidad mantenimiento
-    _weight_7: float = 0.15     # Cumplimiento objetivo
-    
-    _CEE: float = 0.0           # Compatibilidad entre Especies
-    _PSRATA: float = 0.0        # Porcentaje de Satisfacción del Rendimiento Alimenticio o Terapéutico Alcanzado
-    _ECA: float = 0.0           # Eficiencia de Consumo de Agua
+    _weight_1: float = 0.15     # Peso de Compatibilidad especies
+    _weight_2: float = 0.20     # Peso de Rendimiento
+    _weight_3: float = 0.20     # Peso de Eficiencia hídrica
+    _weight_4: float = 0.10     # Peso de Uso espacio
+    _weight_5: float = 0.10     # Peso de Luz solar/sombra
+    _weight_6: float = 0.10     # Peso de Facilidad mantenimiento
+    _weight_7: float = 0.15     # Peso de Cumplimiento objetivo
+
+    # Compatibilidad entre especies plantadas (CEEP)
+    # en ingles:
+    # Compatibility between planted species (CBPS)
+    _CBPS: float = 0.0
+
+    # Porcentaje de Satisfacción del Rendimiento Alimenticio o Terapéutico Alcanzado (PSRATA)
+    # en ingles: 
+    # Percentage of Satisfaction with the Nutritional or Therapeutic Performance Achieved (PSNTPA)
+    _PSNTPA: float = 0.0
+
+    # Eficiencia de Consumo de Agua (ECA)
+    # en ingles:
+    # Water Consumption Efficiency (WCE)
+    _WCE: float = 0.0
     
     _FITNESS: float = 0.0       # Puntaje de aptitud
     _PLANTS: List[PlantVO] = []
     _PLANTS_IN_HUERTO: List[PlantVO] = []
-    _MATRIZ_COMPATIBILIDAD: Dict[Dict[int]] = []
+    _MATRIZ_COMPATIBILIDAD: Dict[str, Dict[str, float]] = []
     _RATD: RATVO            # Rendimiento Alimenticio o Terapéutico Deseado
 
     _SIZE_CELD_MIN: Dict[Literal["width", "height"], float] = {"width": 0.5, "height": 0.5}  # Tamaño mínimo de celda
     _SIZE_CELD_MAX: Dict[Literal["width", "height"], float] = {"width": 1.0, "height": 1.0}  # Tamaño máximo de celda
+    
+    _HUERTO: HuertoType = HuertoType(
+        plants= [],
+        parcela= ParcelaType(
+            size_x= 0.0,  # Ancho de la parcela
+            size_y= 0.0,  # Largo de la parcela
+            layout= []
+        ),
+        compatibilityBetweenPlantedSpecies= 0.0,
+        percentageSatisfactionNutritionalTherapeuticPerformanceAchieved= 0.0,
+        waterConsumptionEfficiency= 0.0,
+        fitnessScore= 0.0
+    )
 
     _RESPONSE: ResponseCalculateFitness = ResponseCalculateFitness(
         message="",
         success=False,
-        fitness=None
+        huerto= None
     )
 
-    def __init__(self, plants: List[PlantVO], matriz_compatibilidad: Dict[Dict[int]], ratd: RATVO):
+    def __init__(self, plants: List[PlantVO], matriz_compatibilidad: Dict[str, Dict[str, float]], ratd: RATVO):
         """
         Inicializa el caso de uso con las plantas, la matriz de compatibilidad y el RATSODUVO.
         """
@@ -48,20 +74,25 @@ class CalculateFitnessUseCase:
         :return: Puntaje de aptitud total.
         """
 
-        self.HUERTO = requestCalculateFitness.huerto
+        self._HUERTO = requestCalculateFitness.huerto
         # Inicializamos las plantas en el huerto, extraemos la información de las plantas
         self.__Inicializate_Plants_In_Huerto()
         
         # Calculamos la compatibilidad entre especies plantadas
-        self.__Calculate_Compatibility()
+        self.__Calculate_CBPS()
         
-        # Calculamos el Rendimiento Alimenticio o Terapéutico del Huerto
-        self.__Calculate_PSRATA()
+        # # Calculamos el Rendimiento Alimenticio o Terapéutico del Huerto
+        # self.__Calculate_PSRATA()
 
         # Calculamos la eficiencia de Consumo de Agua
-        self.__Calculate_ECA()
+        # self.__Calculate_ECA()
         
         
+        self._RESPONSE = ResponseCalculateFitness(
+            message="Cálculo de aptitud realizado con éxito.",
+            success=True,
+            huerto= self._HUERTO
+        )
         
         return self._RESPONSE
 
@@ -72,9 +103,9 @@ class CalculateFitnessUseCase:
         """
         
         try:
-            for plant in self.HUERTO.plants:
+            for plant in self._HUERTO.plants:
                 # buscar la informacion de la planta en la lista de plantas
-                plant_info = next((p for p in self._PLANTS if p.id == plant.id), None)
+                plant_info = next((p for p in self._PLANTS if p.id == plant), None)
                 if plant_info:
                     self._PLANTS_IN_HUERTO.append(plant_info)
         except Exception as e:
@@ -84,7 +115,7 @@ class CalculateFitnessUseCase:
             self._RESPONSE.success = False
             return
 
-    def __Calculate_Compatibility(self) -> None:
+    def __Calculate_CBPS(self) -> None:
         """
         Calcula la compatibilidad entre especies plantadas.
         :return: Puntaje de compatibilidad.
@@ -97,7 +128,7 @@ class CalculateFitnessUseCase:
         pairs: Dict[str,int] = {}
         
         # Obtenemos el layout del huerto
-        layout = self.HUERTO.parcela.layout
+        layout = self._HUERTO.parcela.layout
 
         def generate_key_frozenset(tuplas: Union[tuple, tuple]) -> int:
             """
@@ -107,7 +138,7 @@ class CalculateFitnessUseCase:
 
         for row_index, row_initial in enumerate(layout):
             # calcuamos la posicion de las celdas vecinas "Derecha" y "Abajo"
-            filas_parcela = self.HUERTO.parcela.layout
+            filas_parcela = self._HUERTO.parcela.layout
 
             def get_pairs(row: int | List[int]) -> None:
                 
@@ -145,6 +176,7 @@ class CalculateFitnessUseCase:
                         key_center_right_bottom = generate_key_frozenset((plant_species_center, plant_species_right_bottom))
                         
                         # Obtenemos las compatibilidades de las especies
+                        print(f"Calculando compatibilidad para: {plant_species_center}, {plant_species_right}, {plant_species_bottom}, {plant_species_right_bottom}")
                         valor_compatibilidad_pareja_1 = self._MATRIZ_COMPATIBILIDAD[plant_species_center][plant_species_right]
                         valor_compatibilidad_pareja_2 = self._MATRIZ_COMPATIBILIDAD[plant_species_center][plant_species_bottom]
                         valor_compatibilidad_pareja_3 = self._MATRIZ_COMPATIBILIDAD[plant_species_center][plant_species_right_bottom]
@@ -230,6 +262,12 @@ class CalculateFitnessUseCase:
         Calcula la Eficiencia de Consumo de Agua.
         :return: Eficiencia de Consumo de Agua.
         """
+        
+        # Total Weekly Requirement Hydric (TWRH)
+        totalWeeklyRequirementHydric: float
+        # Maximum Weekly Requirement Hydric (MWRH)
+        maximumWeeklyRequirementHydric: float
+        
         # Obtenemos el layout del huerto
         layout = self.HUERTO.parcela.layout
         
@@ -237,22 +275,43 @@ class CalculateFitnessUseCase:
         weights_celd_rh_max = []
 
         # Inicializamos la variable para el consumo de agua total
-        RHT = 0.0
+        totalWeeklyRequirementHydric = 0.0
         
         # Definimos la funcion recursiva para detectar la planta que genere RH_MAX
         # Cada celda genera un RH_MAX que es el maximo de consumo de agua que puede generar
-        def get_rht_celd(celd: int | List[int] | str) -> Dict[int, float]:
-            nonlocal weights_celd_rh_max, RHT
+        def get_data_celd(celd: int | List[int] | str) -> Dict[str, object] | False:
+            nonlocal weights_celd_rh_max, totalWeeklyRequirementHydric
             """
             Obtiene los pesos de las celdas y el RH_MAX.
             :param row: Fila del layout del huerto.
             """
             if isinstance(celd, list):
                 # Si la celda es una lista, iteramos sobre sus elementos
-                rh_celds = {}
-                for sub_celd in celd:
-                    plant = get_rht_celd(sub_celd)
-                    rh_celds.append(rht)
+                # y llamamos recursivamente a la funcion get_data_celd
+                # para obtener los datos de cada sub-celda
+                row_actual = celd
+                
+                # Inicializamos el diccionario para almacenar los datos de las celdas
+                data_celds = {}
+                
+                # Definimos el contador de celdas ocupadas
+                total_celds_ocuppied = len(row_actual)
+                
+                # Definimos el rh_max de la celda hijo con mas weeklyWatering
+                rh_max_in_celd = 0.0
+                for sub_celd in row_actual:
+                    celd_data = get_data_celd(sub_celd)
+                    if celd_data is False:
+                        total_celds_ocuppied -= 1
+
+                    if celd_data["weeklyWatering"] > rh_max_in_celd:
+                        rh_max_in_celd = celd_data["weeklyWatering"]
+                    # Agregamos los datos de la celda al diccionario
+                    data_celds.update(celd_data)
+                
+                # Ahora calculamos el peso total de la celda padre
+                data_celd = {}
+                
             elif isinstance(celd, int):
                 # Si la celda es un entero, buscamos la planta en la lista de plantas
                 plant = next((p for p in self._PLANTS_IN_HUERTO if p.id == celd), None)
@@ -261,9 +320,19 @@ class CalculateFitnessUseCase:
                     weights_celd_rh_max.append(plant.weeklyWatering)
                     
                     # Sumamos el consumo de agua de la planta al total
-                    RHT += plant.weeklyWatering
+                    totalWeeklyRequirementHydric += plant.weeklyWatering
                     
-                    return plant.weeklyWatering
+                    data_celd = {}
+                    data_celd[plant.id + 1] = {
+                        "weeklyWatering": plant.weeklyWatering,
+                        "species": plant.species,
+                        "count_in_celd": 1,  # Contamos la planta en la celda
+                    }
+
+                    return data_celd
+            elif isinstance(celd, str):
+                # Si la celda es una cadena, es un espacio vacío
+                return False
             
             
         

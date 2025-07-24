@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Literal, Union
 
-from traitlets import Enum
 
 @dataclass
 class ParcelaType:

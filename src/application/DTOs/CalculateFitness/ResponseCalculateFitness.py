@@ -1,6 +1,6 @@
 
-from traitlets import Int
 from dataclasses import dataclass
+from src.domain.entities.HuertoType import HuertoType
 
 
 @dataclass
@@ -11,4 +11,4 @@ class ResponseCalculateFitness:
     """
     message: str
     success: bool
-    fitness: Int | None
+    huerto: HuertoType | None
