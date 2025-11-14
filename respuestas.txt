@@ -1,0 +1,23 @@
+¿Dónde está la lógica completa del Algoritmo Genético? Veo que tienes CalculateFitnessUseCase que calcula el fitness, pero no veo:
+    Empieza de cero y  borra todo el avance actual ademas guiate de el archivo que te mencione que habla completamente del algoritmo Genético
+
+¿Quieres que implemente el AG completo desde cero siguiendo la especificación del documento LaTeX, o ya tienes código del AG en otro archivo?
+    implementa el AG completo desde cero siguiendo la especificación del documento LaTeX
+
+Para el endpoint /generate, necesito saber qué parámetros exactos recibir:
+    Guiate de el docuento para saber que parametros recibir y en caso de que no se envie ninguno pon por defecto valores, y se creativo
+
+Respuesta del endpoint /generate: ¿Qué información debe incluir cada una de las top 3 configuraciones?
+    Layout de plantas (matriz con IDs)
+    Métricas (CEE, PSNTPA, WCE, UE, Fitness)
+    Costo total
+    Agua total requerida
+    Producción estimada
+    - Agrega las que pusiste y Agrega lo necesario
+MongoDB - Colección "Matriz": El JSON actual tiene estructura {"Cilantro": {"Epazote": 0.5, ...}}. ¿Quieres:
+    Opción B: Convertirlo a múltiples documentos para consultas más eficientes, tipo:
+    {
+    "plant1": "Cilantro",
+    "plant2": "Epazote", 
+    "compatibility": 0.5
+    }
