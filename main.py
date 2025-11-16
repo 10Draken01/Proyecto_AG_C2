@@ -1,43 +1,114 @@
-import json
-# leer y escribir archivos JSON
+"""
+Punto de entrada principal del microservicio PlantGen API.
+FastAPI application con arquitectura limpia.
+"""
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-with open('./data/plants_with_id.json', 'r', encoding='utf-8') as file:
-    plants_data = json.load(file)
-    total_plants = len(plants_data)
-    medicinal_count = 0
-    aromatic_count = 0
-    vegetal_count = 0
-    ornamental_count = 0
+from src.infrastructure.config import get_settings
+from src.infrastructure.database.MongoConnection import MongoConnection
+from src.infrastructure.api.routes import health_router, garden_router
+from src.infrastructure.api.middlewares import (
+    error_handler_middleware,
+    request_logger_middleware
+)
 
-    seen_names = set()
-    duplicates = []
+# Load settings
+settings = get_settings()
 
-    for plant in plants_data:
-        name = plant.get('name')
-        if name in seen_names:
-            duplicates.append(name)
-        else:
-            seen_names.add(name)
+# Configure logging
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("plantgen.api")
 
-        types = plant.get('type', [])
-        if 'medicinal' in types:
-            medicinal_count += 1
-        if 'aromatic' in types:
-            aromatic_count += 1
-        if 'vegetable' in types:
-            vegetal_count += 1
-        if 'ornamental' in types:
-            ornamental_count += 1
 
-    print(f"Número total de plantas: {total_plants}")
-    print(f"Número de vegetales: {vegetal_count}")
-    print(f"Número de plantas medicinales: {medicinal_count}")
-    print(f"Número de plantas aromáticas: {aromatic_count}")
-    print(f"Número de plantas ornamentales: {ornamental_count}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Gestión del ciclo de vida de la aplicación.
+    Se ejecuta al inicio y al cierre.
+    """
+    # Startup
+    logger.info("🚀 Iniciando PlantGen API...")
+    await MongoConnection.connect()
+    logger.info("✅ MongoDB conectado exitosamente")
+    yield
+    # Shutdown
+    logger.info("🛑 Cerrando PlantGen API...")
+    await MongoConnection.disconnect()
+    logger.info("✅ MongoDB desconectado")
 
-    if duplicates:
-        print("Plantas repetidas encontradas:")
-        for name in duplicates:
-            print(f"- {name}")
-    else:
-        print("No hay plantas repetidas.")
+
+# Crear aplicación FastAPI
+app = FastAPI(
+    title=settings.API_TITLE,
+    description=settings.API_DESCRIPTION,
+    version=settings.API_VERSION,
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Configurar middlewares
+app.add_middleware(error_handler_middleware())
+app.add_middleware(request_logger_middleware())
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
+)
+
+# Registrar rutas con prefijo /algorithm_gen/v1
+API_V1_PREFIX = "/algorithm_gen"
+app.include_router(health_router, prefix=API_V1_PREFIX)
+app.include_router(garden_router, prefix=API_V1_PREFIX)
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Endpoint raíz"""
+    return {
+        "service": settings.API_TITLE,
+        "version": settings.API_VERSION,
+        "status": "running",
+        "environment": settings.ENVIRONMENT,
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "endpoints": {
+            "health": "/algorithm_gen/health",
+            "generate": "/algorithm_gen/generate"
+        }
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    logger.info(f"""
+    ╔═══════════════════════════════════════════════════╗
+    ║           PlantGen API - Microservicio            ║
+    ║    Optimización de Huertos Urbanos con AG         ║
+    ╠═══════════════════════════════════════════════════╣
+    ║  Puerto: {settings.PORT}                                      ║
+    ║  Entorno: {settings.ENVIRONMENT}                         ║
+    ║  Docs: http://localhost:{settings.PORT}/docs                  ║
+    ║  Health: http://localhost:{settings.PORT}/algorithm_gen/health       ║
+    ║  Generate: http://localhost:{settings.PORT}/algorithm_gen/generate   ║
+    ╚═══════════════════════════════════════════════════╝
+    """)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.PORT,
+        reload=settings.is_development,
+        log_level=settings.LOG_LEVEL.lower()
+    )
